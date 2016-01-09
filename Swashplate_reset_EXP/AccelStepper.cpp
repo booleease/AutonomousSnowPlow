@@ -26,31 +26,29 @@ boolean AccelStepper::runSpeed1()
     unsigned long time = micros();//Adjusted to microsecond based instead of millisecond
 	//unsigned long deltatime;
 	
-  
     if (time > _lastStepTime + _stepInterval)
     {
-	if (_speed > 0)
+		if (_speed > 0)
 		{
-		_forward();
-	    // Clockwise
-	    _currentPos += 1;
-
+			_forward();
+		    // Clockwise
+		    _currentPos += 1;
 		}
-	else if (_speed < 0)
+		else if (_speed < 0)
 		{
-	    // Anticlockwise  
-		_backward();
-	    _currentPos -= 1;
+		    // Anticlockwise  
+			_backward();
+		    _currentPos -= 1;
 		}
-	
-	//deltatime = time - _lastStepTime;
-	_lastStepTime = time;
-	//Serial.println("steptime(us)");
-	//Serial.println(deltatime);
-	return true;
+		
+		//deltatime = time - _lastStepTime;
+		_lastStepTime = time;
+		//Serial.println("steptime(us)");
+		//Serial.println(deltatime);
+		return true;
     }
     else
-	return false;
+		return false;
 }
 
 
@@ -77,26 +75,26 @@ boolean AccelStepper::runSpeed()
   //unsigned long deltatime;
     if (time > _lastStepTime + _stepInterval/1000)
     {
-	if (_speed > 0)
-	{
+		if (_speed > 0)
+		{
 
-	    // Clockwise
-	    _currentPos += 1;
-	}
-	else if (_speed < 0)
-	{
-	    // Anticlockwise  
-	    _currentPos -= 1;
-	}
-	step(_currentPos & 0x3); // Bottom 2 bits (same as mod 4, but works with + and - numbers) 
-	//deltatime = time - _lastStepTime;
-	_lastStepTime = time;
-	//Serial.println("steptime(ms)");
-	//Serial.println(deltatime);
-	return true;
+		    // Clockwise
+		    _currentPos += 1;
+		}
+		else if (_speed < 0)
+		{
+		    // Anticlockwise  
+		    _currentPos -= 1;
+		}
+		step(_currentPos & 0x3); // Bottom 2 bits (same as mod 4, but works with + and - numbers) 
+		//deltatime = time - _lastStepTime;
+		_lastStepTime = time;
+		//Serial.println("steptime(ms)");
+		//Serial.println(deltatime);
+		return true;
     }
     else
-	return false;
+		return false;
 }
 
 long AccelStepper::distanceToGo()
@@ -142,31 +140,31 @@ float AccelStepper::desiredSpeed()
     // Max possible speed that can still decelerate in the available distance
     float requiredSpeed;
     if (distanceTo == 0)
-	return 0.0; // Were there
+		return 0.0; // Were there
     else if (distanceTo > 0) // Clockwise
-	requiredSpeed = sqrt(2.0 * distanceTo * _acceleration);
+		requiredSpeed = sqrt(2.0 * distanceTo * _acceleration);
     else  // Anticlockwise
-	requiredSpeed = -sqrt(2.0 * -distanceTo * _acceleration);
+		requiredSpeed = -sqrt(2.0 * -distanceTo * _acceleration);
 
     if (requiredSpeed > _speed)
     {
-	// Need to accelerate in clockwise direction
-	if (_speed == 0)
-	    requiredSpeed = sqrt(2.0 * _acceleration);
-	else
-	    requiredSpeed = _speed + abs(_acceleration / _speed);
-	if (requiredSpeed > _maxSpeed)
-	    requiredSpeed = _maxSpeed;
+		// Need to accelerate in clockwise direction
+		if (_speed == 0)
+		    requiredSpeed = sqrt(2.0 * _acceleration);
+		else
+		    requiredSpeed = _speed + abs(_acceleration / _speed);
+		if (requiredSpeed > _maxSpeed)
+		    requiredSpeed = _maxSpeed;
     }
     else if (requiredSpeed < _speed)
     {
-	// Need to accelerate in anticlockwise direction
-	if (_speed == 0)
-	    requiredSpeed = -sqrt(2.0 * _acceleration);
-	else
-	    requiredSpeed = _speed - abs(_acceleration / _speed);
-	if (requiredSpeed < -_maxSpeed)
-	    requiredSpeed = -_maxSpeed;
+		// Need to accelerate in anticlockwise direction
+		if (_speed == 0)
+		    requiredSpeed = -sqrt(2.0 * _acceleration);
+		else
+		    requiredSpeed = _speed - abs(_acceleration / _speed);
+		if (requiredSpeed < -_maxSpeed)
+		    requiredSpeed = -_maxSpeed;
     }
 //  Serial.println(requiredSpeed);
     return requiredSpeed;
@@ -269,11 +267,11 @@ void AccelStepper::step(uint8_t step)
 // 0 pin step function (ie for functional usage)
 void AccelStepper::step0()
 {
-  if (_speed > 0) {
-    _forward();
-  } else {
-    _backward();
-  }
+	if (_speed > 0) {
+		_forward();
+	} else {
+		_backward();
+	}
 }
 
 // 1 pin step function (ie for stepper drivers)
@@ -373,14 +371,14 @@ void    AccelStepper::disableOutputs()
 
 void    AccelStepper::enableOutputs()
 {
-    if (! _pins) return;
-
+    if (! _pins)
+    	return;
     pinMode(_pin1, OUTPUT);
     pinMode(_pin2, OUTPUT);
     if (_pins == 4)
     {
-	pinMode(_pin3, OUTPUT);
-	pinMode(_pin4, OUTPUT);
+		pinMode(_pin3, OUTPUT);
+		pinMode(_pin4, OUTPUT);
     }
 }
 

@@ -51,18 +51,18 @@ int ini_flag = 1; //flag to check initialization on swashplate position
 
 //encoder parameters
 char EncReg[10] ={0,0,0,0,0,0,0,0,0,0};
-int CSpin0 = 42; //PL7
-int CLKpin0 = 44; //PL5
-int DATA_pin0 = 46; //PL3
-int CSpin1 = 43; //PL6
-int CLKpin1 = 45; //PL4
-int DATA_pin1 = 47; //PL2
-int enc_left_center = 533;//left swashplate center location
-int enc_left_min = 563;//left swashplate allowed min angle
-int enc_left_max = 503;//left swashplate allowed max angle
-int enc_right_center = 843;//right swashplate center location
-int enc_right_min = 813;//right swashplate allowed min angle
-int enc_right_max = 873;//right swashplate allowed max angle
+#define CSpin0     42         //PL7
+#define CLKpin0    44         //PL5
+#define DATA_pin0  46         //PL3
+#define CSpin1     43         //PL6
+#define CLKpin1    45         //PL4
+#define DATA_pin1  47         //PL2
+#define enc_left_center   533    //left swashplate center location
+#define enc_left_min      563    //left swashplate allowed min angle
+#define enc_left_max      503    //left swashplate allowed max angle
+#define enc_right_center  843    //right swashplate center location
+#define enc_right_min     813    //right swashplate allowed min angle
+#define enc_right_max     873    //right swashplate allowed max angle
 int enc_left_cur = 0; //current left encoder reading
 int enc_right_cur = 0;//current right encoder  reading
 int mask1 = _BV(3); //encoder interpretation mask
@@ -94,12 +94,6 @@ int pos_left_co = 0;
 int pos_right_co = 0;
 int pos_upper_limit = 4000;
 int pos_lower_limit = -4000;
-
-
-
-
-
-
 
 
 
@@ -235,7 +229,6 @@ void stepper_encoder_loop(int L_ENC_Target, int R_ENC_Target) {
     pos_left_ff =  (L_ENC_Target - enc_left_cur) * enc_to_stepper;
     pos_right_ff = (R_ENC_Target - enc_right_cur) * enc_to_stepper;
 
-
 //**PID portion***//
     /*
     	//calculate error
@@ -261,8 +254,9 @@ void stepper_encoder_loop(int L_ENC_Target, int R_ENC_Target) {
       */
     stepper0.move(pos_left_ff);
     stepper1.move(pos_right_ff);
-
 }
+
+
 //define one step cw/ccw output on DIRs and CLKs
 //move  signal outputs to port manipulation method for less delay   9.6us vs 2.12us ..measured on o-scope
 void FWD0()
@@ -272,6 +266,7 @@ void FWD0()
     delayMicroseconds(2);
     PORTA |= (1 << PA0); //set CLK0  HIGH
 }
+
 void REV0()
 {
     PORTA ^=  PINA&(1 << PA2); //set direction LOW
@@ -287,6 +282,7 @@ void FWD1()
     delayMicroseconds(2);
     PORTA |= (1 << PA1); //set CLK0  HIGH
 }
+
 void REV1()
 {
     PORTA ^=  PINA&(1 << PA3); //set direction LOW
