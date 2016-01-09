@@ -163,7 +163,6 @@ void setup()
     {
         pinMode(i,OUTPUT);
         digitalWrite(i,HIGH);
-
     }
 
     //set up Encoder IOs
@@ -207,7 +206,7 @@ void setup()
         stepper_encoder_loop(enc_left_center, enc_right_center);
         digitalWrite(STEPPER0ENABLE,LOW);
         digitalWrite(STEPPER1ENABLE,LOW);
-        while (stepper0.distanceToGo()!=0 || stepper1.distanceToGo()!=0)
+        while (stepper0.distanceToGo()!= 0 || stepper1.distanceToGo()!= 0)
         {
             stepper0.run1();
             stepper1.run1();
