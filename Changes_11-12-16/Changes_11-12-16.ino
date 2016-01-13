@@ -39,6 +39,7 @@ char RX_inputs[4] = {RX0, RX1, RX2}; //wrap into array for initialization
 #define STEPPER0ENABLE 26  //set D26 as Enable PIN for controller 0... PinName PA4
 #define STEPPER1ENABLE 27  //set D27 as ENABLE PIN for controller 1... PinName PA5
 #define step_delay 600 //set the stepping delay (microseconds)
+#define enc_hyst 5
 //Emergency switch
 #define ES_pin 3 //set pin D3 as emergency switch output pinf
 
@@ -77,8 +78,8 @@ char EncReg[10] ={0,0,0,0,0,0,0,0,0,0};
 #define enc_left_max     503  //left swashplate allowed max angle
 //#define enc_right_center 843  //right swashplate center location
 #define enc_right_center 115  //right swashplate center location
-#define enc_right_min    813  //right swashplate allowed min angle
-#define enc_right_max    873  //right swashplate allowed max angle
+#define enc_right_min    104  //right swashplate allowed min angle
+#define enc_right_max    122  //right swashplate allowed max angle
 int enc_left_cur = 0;     //current left encoder reading
 int enc_right_cur = 0;    //current right encoder  reading
 int mask1 = _BV(3);       //encoder interpretation mask
@@ -92,27 +93,6 @@ int enc_right_target = 0; //desired right encoder location .. translated from de
 int enc_to_stepper = 149; //number of step per encoder location change
 int pos_left_ff = 0;  //calculated left FF for desired stepper position
 int pos_right_ff = 0; //calculated right FF for desired stepper position
-
-//pid related parameters. provided but not used or tested at the moment..
-    // int enc_left_error = 0;
-    // int enc_right_error = 0;
-    // int SEL_looptime = 0;
-    // int SEL_looptime_prev = 0;
-    // int SEL_set_looptime = 20;//20ms or 50hz..
-    // int SEL_Klp = 0;
-    // int SEL_Kli = 0;
-    // int SEL_Krp = 0;
-    // int SEL_Kri = 0;
-    // int SEL_left_integral = 0;
-    // int SEL_right_integral = 0;
-    // int SEL_left_PI = 0;
-    // int SEL_right_PI = 0;
-    // int pos_left_co = 0;
-    // int pos_right_co = 0;
-    // int pos_upper_limit = 4000;
-    // int pos_lower_limit = -4000;
-
-
 
 //define one step cw/ccw output on DIRs and CLKs
 //move  signal outputs to port manipulation method for less delay   9.6us vs 2.12us ..measured on o-scope
@@ -145,12 +125,6 @@ void REV1()
     delayMicroseconds(step_delay);
     PORTA ^= (1 << PA1);  // set clock HIGH
 }
-
-
-// Motor shield has two motor ports, now we'll wrap them in an AccelStepper object
-AccelStepper stepper0(FWD0, REV0);
-AccelStepper stepper1(FWD1, REV1);
-
 
 void setup()
 {
@@ -191,18 +165,7 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);//right track
     attachInterrupt(digitalPinToInterrupt(RX2), &rising2, RISING);//emergency stop
 
-
-    //set acc and max speed in Pulse per Second(PPS), and PPS^2
-    //configure controller to 1/2 step type A with current @1.2A
-    stepper0.setMaxSpeed(stepper_SPD);
-    stepper1.setMaxSpeed(stepper_SPD);
-    stepper0.setAcceleration(stepper_ACC);
-    stepper1.setAcceleration(stepper_ACC);
-
-
-
     //***reset/center swashplate angle***//
-    //written. NOT tested.
     Serial.println("Centering Steppers");
     digitalWrite(STEPPER0ENABLE,LOW);
     digitalWrite(STEPPER1ENABLE,LOW);
@@ -211,59 +174,32 @@ void setup()
         FWD0();
         FWD1();
     }
-//    while (ini_flag)
-//    {
-        signed long diff_0, diff_1 = 0;
-        // stepper_encoder_loop(enc_left_center, enc_right_center);
-        do {
-            get_encoders();
-            diff_0 = enc_left_cur - enc_left_center;
-            diff_1 = enc_right_cur - enc_right_center;
-            if(diff_0 < -3) {
-                FWD0();
-            }
-            else if(diff_0 > 3) {
-                REV0();
-            }
-            if(diff_1 > 3) {
-                FWD1();
-            }
-            else if(diff_1 < -3) {
-                REV1();
-            }
-//            Serial.print("Diff0 = ");
-//            Serial.print(diff_0);
-//            Serial.print(" = ");
-//            Serial.print(enc_left_cur);
-//            Serial.print(" - ");
-//            Serial.println( enc_left_center);
-//            Serial.print("Diff1 = ");
-//            Serial.print(diff_1);
-//            Serial.print(" = ");
-//            Serial.print(enc_right_cur);
-//            Serial.print(" - ");
-//            Serial.println( enc_right_center);
-        } while((diff_0 < -3 || diff_0 > 3) || (diff_1 < -3 || diff_1 > 3));
-//        while (stepper0.distanceToGo()!= 0 || stepper1.distanceToGo()!= 0)
-//        {
-//            stepper0.run1();
-//            stepper1.run1();
-//          // Serial.println("Distance to go");
-//         //Serial.println(stepper1.distanceToGo());
-//        }
-        digitalWrite(STEPPER0ENABLE,HIGH);
-        digitalWrite(STEPPER1ENABLE,HIGH);
-        //test if centered
-//        get_encoders();
-//        ini_flag = ((enc_left_center!=enc_left_cur) || (enc_right_cur!=enc_right_center));
-//        Serial.print("this is encoder left: ");
-//        Serial.println(enc_left_cur);
-//    }
+    // Centering steppers
+    signed long diff_0, diff_1 = 0;
+    do {
+        get_encoders();
+        diff_0 = enc_left_cur - enc_left_center;
+        diff_1 = enc_right_cur - enc_right_center;
+        if(diff_0 < -enc_hyst) {
+            FWD0();
+        }
+        else if(diff_0 > enc_hyst) {
+            REV0();
+        }
+        if(diff_1 > enc_hyst) {
+            FWD1();
+        }
+        else if(diff_1 < -enc_hyst) {
+            REV1();
+        }
+    } while((diff_0 < -enc_hyst || diff_0 > enc_hyst) || (diff_1 < -enc_hyst || diff_1 > enc_hyst));
+
+    // disable steppers
+    digitalWrite(STEPPER0ENABLE,HIGH);
+    digitalWrite(STEPPER1ENABLE,HIGH);
+
     Serial.println("Done");
     while(1);
-    //reset stepper internal params
-    stepper0._currentPos = 0;
-    stepper1._currentPos = 0;
 
     digitalWrite(ES_pin, LOW);//disengage, good to start engine
     digitalWrite(STEPPER0ENABLE,LOW);
@@ -273,16 +209,31 @@ void setup()
 
 void loop()
 {
+    // stepper difference to desired
+    signed long diff_0, diff_1 = 0;
     //when both input are updated.. compute new destiation
     if (RX0_new_flag && RX1_new_flag)
     {
         //convert rc input of desired angle in pwm to encoder location
-        enc_left_target = map(r0/5, 180, 420, enc_left_center, enc_left_max);
-        enc_right_target = map(r1/5, 180, 420, enc_right_center, enc_right_max);
-        stepper_encoder_loop(enc_left_target, enc_right_target);
+        enc_left_target = map(r0 - 900, 0, 800, enc_left_center, enc_left_max);
+        enc_right_target = map(r1 - 900, 0, 800, enc_right_center, enc_right_min);
     }
-    stepper0.run1();
-    stepper1.run1();
+    // Move the steppers
+    get_encoders();
+    diff_0 = enc_left_cur - enc_left_target;
+    diff_1 = enc_right_cur - enc_right_target;
+    if(diff_0 < -enc_hyst) {
+        FWD0();
+    }
+    else if(diff_0 > enc_hyst) {
+        REV0();
+    }
+    if(diff_1 > enc_hyst) {
+        FWD1();
+    }
+    else if(diff_1 < -enc_hyst) {
+        REV1();
+    }
 }
 
 
@@ -358,47 +309,6 @@ void falling2() {
     es_value = micros() - prev_time2;
     //put emergency check into interrupt to maximuze effectiveness
     checkES();
-}
-
-void stepper_encoder_loop(int L_ENC_Target, int R_ENC_Target) {
-
-    //read encoder for current swashplte location
-    get_encoders();
-    //Serial.println(enc_left_cur);
-    //Serial.println(enc_right_cur);
-    //Serial.println("/n");
-
-    //feed forward to translate from desired encoder location to target stepper position
-    pos_left_ff =  (L_ENC_Target - enc_left_cur) * enc_to_stepper;
-    pos_right_ff = (R_ENC_Target - enc_right_cur) * enc_to_stepper;
-
-
-//**PID portion***//
-    /*
-        //calculate error
-        enc_left_error = L_ENC_Target - enc_left_cur;
-        enc_right_error = R_ENC_Target - enc_right_cur;
-        //PI controller
-        SEL_looptime = millis() - SEL_looptime_prev; //this gives exact t past since last loop
-        SEL_looptime_prev = millis();
-        SEL_left_integral += enc_left_error * SEL_looptime;
-        SEL_right_integral += enc_right_error * SEL_looptime;
-        SEL_left_PI = SEL_Klp * enc_left_error + SEL_Kli * SEL_left_integral;
-        SEL_right_PI = SEL_Krp * enc_left_error + SEL_Kri * SEL_right_integral;
-        //Combine FF and PI to get command out
-        pos_left_co = pos_left_ff + SEL_left_PI;
-        pos_right_co = pos_right_ff + SEL_left_PI;
-      //Serial.println(pos_left_co);
-      //Serial.println("\n");
-      //Serial.println(pos_right_co);
-        //saturation limit
-      //Serial.println(pos_left_co);
-      //Serial.println(pos_right_co);
-      //Serial.println("/n");
-      */
-    stepper0.move(pos_left_ff);
-    stepper1.move(pos_right_ff);
-
 }
 
 void checkES()
