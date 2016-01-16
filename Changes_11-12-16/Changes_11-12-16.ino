@@ -39,7 +39,7 @@ char RX_inputs[4] = {RX0, RX1, RX2}; //wrap into array for initialization
 #define STEPPER0ENABLE 26  //set D26 as Enable PIN for controller 0... PinName PA4
 #define STEPPER1ENABLE 27  //set D27 as ENABLE PIN for controller 1... PinName PA5
 #define step_delay 600 //set the stepping delay (microseconds)
-#define enc_hyst 5
+#define enc_hyst 7
 //Emergency switch
 #define ES_pin 3 //set pin D3 as emergency switch output pinf
 
@@ -76,10 +76,9 @@ char EncReg[10] ={0,0,0,0,0,0,0,0,0,0};
 #define enc_left_center  533  //left swashplate center location
 #define enc_left_min     563  //left swashplate allowed min angle
 #define enc_left_max     503  //left swashplate allowed max angle
-//#define enc_right_center 843  //right swashplate center location
-#define enc_right_center 115  //right swashplate center location
-#define enc_right_min    104  //right swashplate allowed min angle
-#define enc_right_max    122  //right swashplate allowed max angle
+#define enc_right_center 837  //right swashplate center location (edited 1-15-16 by Brandon Jameson)
+#define enc_right_min    810  //right swashplate allowed min angle
+#define enc_right_max    866  //right swashplate allowed max angle
 int enc_left_cur = 0;     //current left encoder reading
 int enc_right_cur = 0;    //current right encoder  reading
 int mask1 = _BV(3);       //encoder interpretation mask
@@ -161,7 +160,7 @@ void setup()
     }
 
     //enable rx input interrupts
-    attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);//left track
+    attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);//left track  
     attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);//right track
     attachInterrupt(digitalPinToInterrupt(RX2), &rising2, RISING);//emergency stop
 
@@ -177,9 +176,11 @@ void setup()
     // Centering steppers
     signed long diff_0, diff_1 = 0;
     do {
+       
         get_encoders();
         diff_0 = enc_left_cur - enc_left_center;
         diff_1 = enc_right_cur - enc_right_center;
+
         if(diff_0 < -enc_hyst) {
             FWD0();
         }
@@ -199,7 +200,7 @@ void setup()
     digitalWrite(STEPPER1ENABLE,HIGH);
 
     Serial.println("Done");
-    while(1);
+    //while(1);
 
     digitalWrite(ES_pin, LOW);//disengage, good to start engine
     digitalWrite(STEPPER0ENABLE,LOW);
@@ -212,27 +213,35 @@ void loop()
     // stepper difference to desired
     signed long diff_0, diff_1 = 0;
     //when both input are updated.. compute new destiation
+
     if (RX0_new_flag && RX1_new_flag)
     {
         //convert rc input of desired angle in pwm to encoder location
-        enc_left_target = map(r0 - 900, 0, 800, enc_left_center, enc_left_max);
-        enc_right_target = map(r1 - 900, 0, 800, enc_right_center, enc_right_min);
+        enc_left_target = map(r0, 900, 1700, enc_left_min, enc_left_max);
+        enc_right_target = map(r1, 900, 1700, enc_right_min, enc_right_max);
+//        Serial.println(r0);
+//        Serial.println(r1);
     }
+//    Serial.print("Encoder Target");
+  //  Serial.println(enc_right_target);
     // Move the steppers
     get_encoders();
+   
     diff_0 = enc_left_cur - enc_left_target;
     diff_1 = enc_right_cur - enc_right_target;
+//    Serial.println(int(diff_0));
+//    Serial.println(int(diff_1));
     if(diff_0 < -enc_hyst) {
-        FWD0();
-    }
-    else if(diff_0 > enc_hyst) {
         REV0();
     }
+    else if(diff_0 > enc_hyst) {
+        FWD0();
+    }
     if(diff_1 > enc_hyst) {
-        FWD1();
+        REV1();
     }
     else if(diff_1 < -enc_hyst) {
-        REV1();
+        FWD1();
     }
 }
 
@@ -281,7 +290,6 @@ void falling0() {
     attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);
     r0 = micros() - prev_time0;
     RX0_new_flag = 1;
-    //Serial.println(r0);
 
 }
 
@@ -295,7 +303,6 @@ void falling1() {
     attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);
     r1 = micros() - prev_time1;
     RX1_new_flag = 1;
-    //Serial.println(r1);
 }
 
 void rising2()
@@ -314,13 +321,9 @@ void falling2() {
 void checkES()
 {
     //only pwm input between 900~1700us is valid... otherwise engage ES
-    if (es_value <= 1700 && es_value >= 900 )
+    if (es_value <= 1400 && es_value >= 900 )
     {
-        return; // nothing happens when emergency stop channel is off
-    }
-    else
-    {
-        digitalWrite(es_value, HIGH);  // emergency stop triggered. engage ES relay
+        digitalWrite(es_value, LOW);  // emergency stop triggered. engage ES relay
         //disable both stepper
         digitalWrite(STEPPER0ENABLE, HIGH);
         digitalWrite(STEPPER1ENABLE, HIGH);
@@ -333,6 +336,11 @@ void checkES()
             Serial.println("Emergency Stop Engaged... waiting for rescue...");
             delay(1000);
         }
+        
+    }
+    else
+    {
+        return; // nothing happens when emergency stop channel is off
     }
 
 }
