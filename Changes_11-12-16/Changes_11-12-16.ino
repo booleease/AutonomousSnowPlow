@@ -73,12 +73,12 @@ char EncReg[10] ={0,0,0,0,0,0,0,0,0,0};
 #define CSpin1    43 //PL6
 #define CLKpin1   45 //PL4
 #define DATA_pin1 47 //PL2
-#define enc_left_center  533  //left swashplate center location
-#define enc_left_min     563  //left swashplate allowed min angle
-#define enc_left_max     503  //left swashplate allowed max angle
-#define enc_right_center 837  //right swashplate center location (edited 1-15-16 by Brandon Jameson)
-#define enc_right_min    810  //right swashplate allowed min angle
-#define enc_right_max    866  //right swashplate allowed max angle
+#define enc_left_center  533                     //left swashplate center location
+#define enc_left_min     (enc_left_center + 30)  //left swashplate allowed min angle
+#define enc_left_max     (enc_left_center - 30)  //left swashplate allowed max angle
+#define enc_right_center 837                     //right swashplate center location (edited 1-15-16 by Brandon Jameson)
+#define enc_right_min    (enc_right_center - 30) //right swashplate allowed min angle
+#define enc_right_max    (enc_right_center + 30) //right swashplate allowed max angle
 int enc_left_cur = 0;     //current left encoder reading
 int enc_right_cur = 0;    //current right encoder  reading
 int mask1 = _BV(3);       //encoder interpretation mask
@@ -125,58 +125,10 @@ void REV1()
     PORTA ^= (1 << PA1);  // set clock HIGH
 }
 
-void setup()
+void center_steppers()
 {
-    Serial.begin(115200);           // set up Serial library at 57600 bps
-    Serial.println("System Initializing... All output DISABLED \n");
-
-    pinMode(ES_pin,OUTPUT);
-    digitalWrite(ES_pin, HIGH);//engage, cannot start engine before init completed
-
-    //enable stepper pins and all set HIGH- DISABLED
-    for (i=22;i<=27;i++)
-    {
-        pinMode(i,OUTPUT);
-        digitalWrite(i,HIGH);
-    }
-
-    //set up Encoder IOs
-    pinMode(42, OUTPUT);
-    pinMode(44, OUTPUT);
-    pinMode(43, OUTPUT);
-    pinMode(45, OUTPUT);
-    pinMode(46, INPUT);
-    pinMode(47, INPUT);
-    digitalWrite(42, HIGH);
-    digitalWrite(44, HIGH);
-    digitalWrite(43, HIGH);
-    digitalWrite(45, HIGH);
-
-    //initialize RX input pins
-    for (i=RX0;i<=RX2;i++)
-    {
-        pinMode(i,INPUT);
-        digitalWrite(i,HIGH);//pull high
-    }
-
-    //enable rx input interrupts
-    attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);//left track  
-    attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);//right track
-    attachInterrupt(digitalPinToInterrupt(RX2), &rising2, RISING);//emergency stop
-
-    //***reset/center swashplate angle***//
-    Serial.println("Centering Steppers");
-    digitalWrite(STEPPER0ENABLE,LOW);
-    digitalWrite(STEPPER1ENABLE,LOW);
-    long start = millis();
-    while(millis() - start < 3000) {
-        FWD0();
-        FWD1();
-    }
-    // Centering steppers
     signed long diff_0, diff_1 = 0;
     do {
-       
         get_encoders();
         diff_0 = enc_left_cur - enc_left_center;
         diff_1 = enc_right_cur - enc_right_center;
@@ -187,64 +139,16 @@ void setup()
         else if(diff_0 > enc_hyst) {
             REV0();
         }
-        if(diff_1 > enc_hyst) {
+        if(diff_1 < -enc_hyst) {
             FWD1();
         }
-        else if(diff_1 < -enc_hyst) {
+        else if(diff_1 > enc_hyst) {
             REV1();
         }
     } while((diff_0 < -enc_hyst || diff_0 > enc_hyst) || (diff_1 < -enc_hyst || diff_1 > enc_hyst));
-
-    // disable steppers
-    digitalWrite(STEPPER0ENABLE,HIGH);
-    digitalWrite(STEPPER1ENABLE,HIGH);
-
-    Serial.println("Done");
-    //while(1);
-
-    digitalWrite(ES_pin, LOW);//disengage, good to start engine
-    digitalWrite(STEPPER0ENABLE,LOW);
-    digitalWrite(STEPPER1ENABLE,LOW);
+    enc_right_target = enc_right_center;
+    enc_left_target = enc_left_center;
 }
-
-
-void loop()
-{
-    // stepper difference to desired
-    signed long diff_0, diff_1 = 0;
-    //when both input are updated.. compute new destiation
-
-    if (RX0_new_flag && RX1_new_flag)
-    {
-        //convert rc input of desired angle in pwm to encoder location
-        enc_left_target = map(r0, 900, 1700, enc_left_min, enc_left_max);
-        enc_right_target = map(r1, 900, 1700, enc_right_min, enc_right_max);
-//        Serial.println(r0);
-//        Serial.println(r1);
-    }
-//    Serial.print("Encoder Target");
-  //  Serial.println(enc_right_target);
-    // Move the steppers
-    get_encoders();
-   
-    diff_0 = enc_left_cur - enc_left_target;
-    diff_1 = enc_right_cur - enc_right_target;
-//    Serial.println(int(diff_0));
-//    Serial.println(int(diff_1));
-    if(diff_0 < -enc_hyst) {
-        REV0();
-    }
-    else if(diff_0 > enc_hyst) {
-        FWD0();
-    }
-    if(diff_1 > enc_hyst) {
-        REV1();
-    }
-    else if(diff_1 < -enc_hyst) {
-        FWD1();
-    }
-}
-
 
 
 //GET encoder reading. SSI interface is defined on datasheet. direct port manipulation is used to speed up interfacing time
@@ -286,6 +190,7 @@ void rising0()
     prev_time0 = micros();
 }
 
+
 void falling0() {
     attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);
     r0 = micros() - prev_time0;
@@ -293,11 +198,13 @@ void falling0() {
 
 }
 
+
 void rising1()
 {
     attachInterrupt(digitalPinToInterrupt(RX1), &falling1, FALLING);
     prev_time1 = micros();
 }
+
 
 void falling1() {
     attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);
@@ -305,11 +212,13 @@ void falling1() {
     RX1_new_flag = 1;
 }
 
+
 void rising2()
 {
     attachInterrupt(digitalPinToInterrupt(RX2), &falling2, FALLING);
     prev_time2 = micros();
 }
+
 
 void falling2() {
     attachInterrupt(digitalPinToInterrupt(RX2), &rising2, RISING);
@@ -318,32 +227,136 @@ void falling2() {
     checkES();
 }
 
+
 void checkES()
 {
-    //only pwm input between 900~1700us is valid... otherwise engage ES
-    if (es_value <= 1400 && es_value >= 900 )
+    // if we get a valid E stop signal (900 - 1400), or an invalid signal ( less than 900 or more than 1900)
+    // E stop!
+    static int valid_estop = 0;
+    //Serial.println(es_value);
+    if ((es_value <= 1400 && es_value >= 1000))
     {
-        digitalWrite(es_value, LOW);  // emergency stop triggered. engage ES relay
-        //disable both stepper
-        digitalWrite(STEPPER0ENABLE, HIGH);
-        digitalWrite(STEPPER1ENABLE, HIGH);
+        valid_estop += 1;
+        if(valid_estop >= 5) {
+            digitalWrite(ES_pin, LOW);  // emergency stop triggered. engage ES relay
+            //disable both stepper
+            digitalWrite(STEPPER0ENABLE, HIGH);
+            digitalWrite(STEPPER1ENABLE, HIGH);
 
-        //enter infinity loop and wait for rescue
-        while (1)
-        {
-            //add any signaling here
-            //signaling
-            Serial.println("Emergency Stop Engaged... waiting for rescue...");
-            delay(1000);
+            //enter infinity loop and wait for rescue
+            while (1)
+            {
+                //add any signaling here
+                //signaling
+                Serial.println("Emergency Stop Engaged... waiting for rescue...");
+                delay(10000);
+            }
         }
-        
     }
+    // if we get a valid OK signal, enable steppers
     else
     {
-        return; // nothing happens when emergency stop channel is off
+        valid_estop = 0;
     }
 
 }
 
+/**************************************************************
+*                       SETUP FUNCTION                        *
+**************************************************************/
 
 
+void setup()
+{
+    Serial.begin(115200);           // set up Serial library at 57600 bps
+    Serial.println("System Initializing... All output DISABLED \n");
+
+    pinMode(ES_pin,OUTPUT);
+    digitalWrite(ES_pin, LOW);//engage, cannot start engine before init completed
+
+    //enable stepper pins and all set HIGH- DISABLED
+    for (i=22;i<=27;i++)
+    {
+        pinMode(i,OUTPUT);
+        digitalWrite(i,HIGH);
+    }
+
+    //set up Encoder IOs
+    pinMode(42, OUTPUT);
+    pinMode(44, OUTPUT);
+    pinMode(43, OUTPUT);
+    pinMode(45, OUTPUT);
+    pinMode(46, INPUT);
+    pinMode(47, INPUT);
+    digitalWrite(42, HIGH);
+    digitalWrite(44, HIGH);
+    digitalWrite(43, HIGH);
+    digitalWrite(45, HIGH);
+
+    //initialize RX input pins
+    for (i=RX0;i<=RX2;i++)
+    {
+        pinMode(i,INPUT);
+        digitalWrite(i,HIGH);//pull high
+    }
+
+    //enable rx input interrupts
+    attachInterrupt(digitalPinToInterrupt(RX0), &rising0, RISING);//left track  
+    attachInterrupt(digitalPinToInterrupt(RX1), &rising1, RISING);//right track
+    attachInterrupt(digitalPinToInterrupt(RX2), &rising2, RISING);//emergency stop
+
+    //***reset/center swashplate angle***//
+    Serial.println("Centering Steppers");
+    digitalWrite(STEPPER0ENABLE,LOW);
+    digitalWrite(STEPPER1ENABLE,LOW);
+    // Centering steppers
+    center_steppers();
+    digitalWrite(ES_pin, HIGH);   // disengage ES relay
+    Serial.println("Done");
+}
+
+
+/**************************************************************
+*                        LOOP FUNCTION                        *
+**************************************************************/
+
+void loop()
+{
+    // stepper difference to desired
+    static signed long diff_0, diff_1 = 0;
+    //when both input are updated.. compute new destiation
+
+    if (RX0_new_flag && RX1_new_flag)
+    {
+        // Move the steppers
+        get_encoders();
+        //convert rc input of desired angle in pwm to encoder location
+        enc_left_target  = map(r0 - 1100, 0, 800, enc_left_center, enc_left_max);
+        enc_right_target = map(r1 - 1100, 0, 800, enc_right_center, enc_right_max);
+        // Update the difference
+        diff_0 = enc_left_cur - enc_left_target;
+        diff_1 = enc_right_cur - enc_right_target;
+        /*
+        Serial.print("Left  Current: ");
+        Serial.print(enc_left_cur);
+        Serial.print("   Left  Target: ");
+        Serial.println(enc_left_target);
+        Serial.print("Right Current: ");
+        Serial.print(enc_left_cur);
+        Serial.print("   Right Target: ");
+        Serial.println(enc_left_target);
+        */
+    }
+    if(diff_0 < -enc_hyst) {
+        FWD0();
+    }
+    else if(diff_0 > enc_hyst) {
+        REV0();
+    }
+    if(diff_1 < -enc_hyst) {
+        FWD1();
+    }
+    else if(diff_1 > enc_hyst) {
+        REV1();
+    }
+}
