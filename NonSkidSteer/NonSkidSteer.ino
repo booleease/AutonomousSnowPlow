@@ -39,7 +39,7 @@ char RX_inputs[4] = {RX0, RX1, RX2}; //wrap into array for initialization
 #define STEPPER0ENABLE 26  //set D26 as Enable PIN for controller 0... PinName PA4
 #define STEPPER1ENABLE 27  //set D27 as ENABLE PIN for controller 1... PinName PA5
 #define step_delay 600 //set the stepping delay (microseconds)
-#define enc_hyst 7
+#define enc_hyst 1
 //Emergency switch
 #define ES_pin 3 //set pin D3 as emergency switch output pinf
 
@@ -73,12 +73,17 @@ char EncReg[10] ={0,0,0,0,0,0,0,0,0,0};
 #define CSpin1    43 //PL6
 #define CLKpin1   45 //PL4
 #define DATA_pin1 47 //PL2
-#define enc_left_center  533                     //left swashplate center location
-#define enc_left_min     (enc_left_center + 30)  //left swashplate allowed min angle
-#define enc_left_max     (enc_left_center - 30)  //left swashplate allowed max angle
-#define enc_right_center 837                     //right swashplate center location (edited 1-15-16 by Brandon Jameson)
-#define enc_right_min    (enc_right_center - 30) //right swashplate allowed min angle
-#define enc_right_max    (enc_right_center + 30) //right swashplate allowed max angle
+#define enc_diff  30.0
+#define turn_mod_delta   15.0
+#define enc_left_center  533                           //left swashplate center location
+#define enc_left_min     (enc_left_center + enc_diff)  //left swashplate allowed min angle
+#define enc_left_max     (enc_left_center - enc_diff)  //left swashplate allowed max angle
+#define enc_right_center 837                           //right swashplate center location (edited 1-15-16 by Brandon Jameson)
+#define enc_right_min    (enc_right_center - enc_diff) //right swashplate allowed min angle
+#define enc_right_max    (enc_right_center + enc_diff) //right swashplate allowed max angle
+#define pixhawk_pwm_max  1892.0
+#define pixhawk_pwm_min  1092.0
+
 int enc_left_cur = 0;     //current left encoder reading
 int enc_right_cur = 0;    //current right encoder  reading
 int mask1 = _BV(3);       //encoder interpretation mask
@@ -325,33 +330,47 @@ void loop()
     // stepper difference to desired
     static signed long diff_0, diff_1 = 0;
     static unsigned long last_update = micros();
+    float throttle_perc = 0;
+    float turn_perc = 0;
+    int turn_mod_L = 0;
+    int turn_mod_R = 0;
     //when both input are updated.. compute new destiation
-    
+    // update when we have new info and it's been longer than 100 ms
     if (RX0_new_flag && RX1_new_flag && (micros() - last_update) > 100000)
     {
         last_update = micros();
         // Move the steppers
         get_encoders();
-        //convert rc input of desired angle in pwm to encoder location
-        enc_left_target  = map(r0 - 1100, 0, 800, enc_left_center, enc_left_max);
-        enc_right_target = map(r1 - 1100, 0, 800, enc_right_center, enc_right_max);
+        // throttle percentage
+        float throttle_perc = ((r0 - pixhawk_pwm_min) / (pixhawk_pwm_max - pixhawk_pwm_min));
+        // turning percentage (-50% to 50%)
+        float turn_perc = ((r1 - 1492.0) / (pixhawk_pwm_max - pixhawk_pwm_min));
+        // Serial.print("turn percentage: ");
+        // Serial.println(turn_perc);
+        // Serial.print("throttle percentage: ");
+        // Serial.println(throttle_perc);
+        // turning right
+        if(turn_perc > 0) {
+            turn_mod_L = ((turn_perc) * (1.0 - throttle_perc)) * (turn_mod_delta * 2.0);
+            turn_mod_R = ((turn_perc * (-1.0)) * (throttle_perc)) * (turn_mod_delta * 2.0);
+        }
+        // turning left
+        else {
+            turn_mod_R = ((turn_perc) * (-1.0) * (1.0 - throttle_perc)) * (turn_mod_delta * 2.0);
+            turn_mod_L = ((turn_perc) * (throttle_perc)) * (turn_mod_delta * 2.0);
+        }
+        Serial.print("left turn mod: ");
+        Serial.println(turn_mod_L);
+        Serial.print("right turn mod: ");
+        Serial.println(turn_mod_R);
+        enc_left_target = throttle_perc * enc_diff + enc_left_center + turn_mod_L;
+        enc_right_target = throttle_perc * enc_diff + enc_right_center + turn_mod_R;
         // Update the difference
+
         diff_0 = enc_left_cur - enc_left_target;
         diff_1 = enc_right_cur - enc_right_target;
-        Serial.print("r0: ");
-        Serial.println(r0);
-        /*
-        Serial.print("Left  Current: ");
-        Serial.print(enc_left_cur);
-        Serial.print("   Left  Target: ");
-        Serial.println(enc_left_target);
-        Serial.print("Right Current: ");
-        Serial.print(enc_left_cur);
-        Serial.print("   Right Target: ");
-        Serial.println(enc_left_target);
-        */
     }
-    /*
+
     if(diff_0 < -enc_hyst) {
         FWD0();
     }
@@ -364,5 +383,4 @@ void loop()
     else if(diff_1 > enc_hyst) {
         REV1();
     }
-    */
 }
